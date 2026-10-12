@@ -1,0 +1,242 @@
+---
+title: "Does Driving Longer Cost You Less?"
+# subtitle: "Maybe..."
+author: "Evan Farnsworth"
+thanks: "Project repository available at: [https://github.com/efar301/261A_P1](https://github.com/efar301/261A_P1)."
+date: today
+date-format: long
+abstract: "This project aims to discover whether there is a relationship between the years someone has been licensed and their liability premium. The dataset consisted of several years of policy level data on 350,000 insurance customers. After analysis, there is a minor relationship between the years a driver is licensed and their liability premium if their policy has a deductible. If an insured does not have a deducible, their years licensed also does not seem to have a linear relationship with their liability premium."
+format: pdf
+bibliography: references.bib
+number-sections: true
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(patchwork)
+
+data = read.csv("data/cleaned_data.csv")
+
+insplot = function(df, target_year, target_policy_type, include_params=FALSE) {
+
+    df = df %>%
+        filter(year==target_year, policy_type==target_policy_type)
+
+
+	model = lm(liability_premium ~ years_licensed, data = df)
+
+	summ = summary(model)
+
+	# print(summ)
+	img = ggplot(df, aes(x = years_licensed, y = liability_premium)) +
+		theme_minimal() +
+		geom_point(color = "#3a86d4") +
+		geom_abline(
+			intercept = summ$coefficients[1],
+			slope = summ$coefficients[2],
+			color = "darkorange"
+		) +
+		labs(
+			# title = paste(
+			# 	"Years Licensed vs. Liability Premium for ",
+			# 	target_policy_type
+			# ),
+            title=paste(target_policy_type, "Policies"),
+			x = "Years Licensed",
+			y = "Liability Premium"
+		)
+        if (include_params) {
+		img = img + annotate(
+			"text",
+			x = Inf,
+			y = Inf,
+			label = paste(
+				"y = ",
+				round(summ$coefficients[1], 2),
+				" + ",
+				round(summ$coefficients[2], 2),
+				"x"
+			),
+			hjust = 1.1,
+			vjust = 1.5
+		) +
+        annotate(
+			"text",
+			x = Inf,
+			y = Inf,
+			label = paste(
+				"Intercept p: ",
+				round(summ$coefficients[1, "Pr(>|t|)"], 3),
+				" Slope p: ",
+				round(summ$coefficients[2, "Pr(>|t|)"], 3)
+			),
+			hjust = 1.1,
+			vjust = 3
+		) +
+		annotate(
+			"text",
+			x = Inf,
+			y = Inf,
+			label = paste(
+				"R^2: ",
+				round(summ$r.squared, 4)
+			),
+			hjust = 1.1,
+			vjust = 4.5
+		)
+        }
+    return(img)
+	# return(summ)
+}
+
+resplot = function(df, target_year, target_policy_type) {
+    df = df %>%
+        filter(year==target_year, policy_type==target_policy_type)
+
+    model = lm(liability_premium ~ years_licensed, data = df)
+
+    plot_df = data.frame(
+        fitted = fitted(model),
+        residuals = residuals(model)
+    )
+
+	summ = summary(model)
+
+
+    res = ggplot(plot_df, aes(x = fitted, y = residuals)) +
+        geom_point(color = "#3a86d4") +
+        geom_hline(yintercept = 0, linetype = "dashed") +
+        theme_minimal() +
+        labs(
+            x = "Fitted Values",
+            y = "Residuals",
+        title = paste("Residual Plot for", target_policy_type)
+    )
+    return(res)
+}
+
+qqplot_res = function(df, target_year, target_policy_type) {
+    df = df %>%
+        filter(year == target_year, policy_type == target_policy_type)
+
+    model = lm(liability_premium ~ years_licensed, data = df)
+
+    plot_df = data.frame(residuals = residuals(model))
+
+    ggplot(plot_df, aes(sample = residuals)) +
+        stat_qq(color = "#3a86d4") +
+        stat_qq_line(color = "darkorange") +
+        theme_minimal() +
+        labs(
+            title = paste("Residual QQ Plot for", target_policy_type),
+            x = "Theoretical Normal Quantiles",
+            y = "Sample Residual Quantiles"
+        )
+}
+```
+
+## Introduction
+
+An insurance premium is a recurring payment that an insured will pay to an insurer in order to retain coverage, and for this project, vehicles. Taking into account countless variables such as the cost of a vehicle, a drivers age, and many more can allow an insurer to optimally price an insurance policy so that the insured will pay as low as possible while also guaranteeing that the insurer will also make profit. A premium can be split into multiple categories, derived from what the insured wants protection from, including but not limited to third parties, property, injury, and liability. 
+
+This project mainly focuses on liability premium, or the premium an insured pays to cover damage to a third party. Knowing the relationship between an insured's characteristics and their liability premium allows an insured to see what steps they can possibly take to reduce their future premiums. Furthermore, it allows insurers to adjust an insured's premiums in accordance to changes in behavior. 
+
+Auto insurance premium pricing is notoriously difficult, especially for individuals who have already incurred a loss. There is a large multitude of factors that can influence the cost of an insured's insurance premium. The goal of this project was to isolate the effect of the number of years holding a driver's license will affect liability premium. It is reasonable to suspect that holding a driver's license longer would mean that an insured would be a safer driver, and thus need lower liability coverage than an insured who was just licensed.
+
+This project aims to determine if a deductible has an impact on the relationship liability premium and the years an insured has been licensed. A deductible is a payment that an insured makes on a policy under the threshold they decide if a loss occurs. The initial assumption is yes, because a deductible reduces the amount of money than an insurer is liable to pay, given that a loss is incurred. 
+
+## Data
+The dataset chosen for this task was "A detailed dataset of motor insurance policies with coverage specific financial information" [@data]. It consists of 354,140 rows and 47 variables. Each row is a policy transaction, meaning a single insurance policy and its status over the year the data was collected. Each policy is tied to one vehicle only. While this dataset ranges from the years 2022 to 2024, this project only focuses on the year 2022 for brevity.
+
+The data was collected from a Spanish insurance company, and of the 354,140 observations, >185,000 of them are unique insured policies. Each of the observations is anonymized, normalized, and had its range validated by the creators of the dataset. 
+
+The response variable in question for this project is `liability premium`. The predictor variable is `years_licensed`, which is the number of years an insured has held their driver's license. Because `years_licensed` is not a variable in the original dataset, it is derived from `driver_age` (the age of the driver) and `age_driving_license` (at what age the driver earned their license).
+
+$$
+\texttt{years\_licensed} = \texttt{driver\_age} - \texttt{age\_driving\_license}
+$$
+The other variable used was `policy_type`, which represents the type of policy that an insured has. The policy types are: Comprehensive coverage with excess, meaning coverage with a deductible (COMP_E), and Comprehensive without excess, meaning coverage without a deductible (COMP_N). 
+
+This is used to segment insured and their premiums because this project only focuses on insured's who have incurred at least one loss. 
+
+## Methods
+
+To investigate the relationship between `liability_premium` and `years_licensed`, I used a simple linear regression model. The response is `liability_premium` and the predictor is `years_licensed`. The simple linear regression model is defined as 
+
+$$
+    Y = \beta_0 + \beta_1X + \epsilon
+$$
+where Y is the predicted `liability_premium`, $\beta_0$ is the intercept, $\beta_1$ is the slope, $X$ is the `years_licensed` and $\epsilon$ is the error. 
+
+The assumptions of simple linear regression are:
+
+- A linear relationship between the predictor and response
+- Independent errors
+- Normal errors with mean 0 and variance $\sigma^2$
+- Equal variance among errors
+
+R [@r] is used for the analysis and plotting.
+
+
+## Results
+
+Simple linear regression indicates there is a weak negative relationship between liability premium and the number of years licensed for COMP_E policies. More specifically, for every year longer an insured is licensed, they can expect their liability premium to decrease by about $1.76. However, both the slope and y intercept are statistically significant, but the change very minor amount compared to the general cost of a premium. Furthermore, years insured only explains 2.49% of the variance in liability premium, which makes sense as there are many more factors that can contribute to an insured's liability premium cost changing.
+
+As for COMP_N policies, there is no discernable linear relationship between the years licensed and liability premium. The slope was not statistically significant, and the $R^2$ was 0.0015, meaning that the fitted regression line only explained 0.15% of the variance in liability premium. 
+
+```{r}
+#| label: fig-policy-plots
+#| fig-align: center
+#| fig-pos: 'H'
+#| fig-height: 5
+#| echo: false
+compe_ins = insplot(data, 2022, "COMP_E", include_params=TRUE)
+compn_ins = insplot(data, 2022, "COMP_N", include_params=TRUE)
+(compe_ins / compn_ins) + plot_annotation(title="Years Licensed vs. Liability Premium by Policy Type")
+```
+
+
+### Validation of Assumptions
+
+The residual error plots below show that there is a clear nonlinearity in the data. This nonlinearity makes sense, as liability premium has a lower bound of 0. Furthermore, the errors do not seems to appear normal, as they all skew upwards. This again is most likely due to the nature of the data, where there is no upper bound on liability premium but there is a lower bound of 0. Furthermore, the variance does not seem to have equal variance. In the COMP_E residual plot, the larger fitted values have a wider spread than the smaller fitted values. The COMP_N plot clearly shows a nonlinearity as small fitted values have positive residual errors, and large ones also have only positive residual errors.
+
+These plots indicate that linear regression is not a great fit for this data, and especially not for inference of the liability premium.
+
+```{r}
+#| label: fig-residual-plots
+#| fig-align: center
+#| fig-pos: 'H'
+#| fig-height: 6
+#| echo: false
+compe_res = resplot(data, 2022, "COMP_E")
+compn_res = resplot(data, 2022, "COMP_N")
+(compe_res / compn_res) + plot_annotation(title="Residual Errors")
+```
+
+```{r}
+#| label: fig-qq-plots
+#| fig-align: center
+#| fig-pos: 'H'
+#| fig-height: 6
+#| echo: false
+compe_qq = qqplot_res(data, 2022, "COMP_E")
+compn_qq = qqplot_res(data, 2022, "COMP_N")
+(compe_qq / compn_qq) + plot_annotation(title="QQ Plots")
+```
+
+The QQ plots for the errors show clear error nonlinearity in both, with mainly a tail to the right, which makes the statistical tests for the $\beta_0$ and $\beta_1$ untrustworthy. b
+
+## Conclusion
+
+This projects finds that a deductible makes liability premium somewhat more predictable, given the number of years an insured has been licensed. This makes intuitive sense, as a COMP_N policy encourages an insured to claim every small dent and scratch on a vehicle, contrary to a COMP_E policy which pushes the cost of minor damage of a vehicle to the owner. 
+
+The cost of a COMP_E policy being minorly explained by the number of years an insured has been licensed is reasonable, as being licensed for longer generally indicates an insured is a safer driver, thus causing less damage to their own vehicle and others. 
+
+COMP_N policy costs being difficult to explain with linear regression is expected. Because an insurer has to pay for damage much more often on a COMP_N policy, it is harder to predict a liability premium, as the vehicle and its characteristics, and play a larger role in the cost of a liability premium. Damage to expensive vehicles, or vehicles with rare parts can exacerbate the cost of repair, making premium increase. On the contrary, common vehicles are easy to repair, and thus may push the liability premium down.
+
+## References
