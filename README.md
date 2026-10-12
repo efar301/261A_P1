@@ -7,7 +7,7 @@ The project uses 2022 observations with positive liability incurred. It fits a s
 
 ## Data
 
-The data can be found [here](https://www.sciencedirect.com/science/article/pii/S235234092600435X). 
+The data can be found [here](https://www.sciencedirect.com/science/article/pii/S235234092600435X). It is licensed under creative commons attribution 4.0. 
 
 The data is cleaned with `ins.r`, and then should be put in the `data\` directory if it is not automatically set there.
 
