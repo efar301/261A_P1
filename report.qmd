@@ -5,7 +5,7 @@ author: "Evan Farnsworth"
 thanks: "Project repository available at: [https://github.com/efar301/261A_P1](https://github.com/efar301/261A_P1)."
 date: today
 date-format: long
-abstract: "This project aims to discover whether there is a relationship between the years someone has been licensed and their liability premium. The dataset consisted of several years of policy level data on 350,000 insurance customers. After analysis, there is a minor relationship between the years a driver is licensed and their liability premium if their policy has a deductible. If an insured does not have a deducible, their years licensed also does not seem to have a linear relationship with their liability premium."
+abstract: "This project aims to discover whether there is a relationship between the years someone has been licensed and their liability premium. The dataset consisted of several years of policy level data on 354,140 European insurance customers. After analysis, there is a minor relationship between the years a driver is licensed and their liability premium if their policy has a deductible. If an insured does not have a deducible, their years licensed also does not seem to have a linear relationship with their liability premium."
 format: pdf
 bibliography: references.bib
 number-sections: true
@@ -138,6 +138,15 @@ qqplot_res = function(df, target_year, target_policy_type) {
             y = "Sample Residual Quantiles"
         )
 }
+
+ci = function(df, target_year, target_policy_type) {
+    df = df %>%
+        filter(year == target_year, policy_type == target_policy_type)
+
+    model = lm(liability_premium ~ years_licensed, data = df)
+    return(confint(model, level=.95))
+}
+
 ```
 
 ## Introduction
@@ -151,9 +160,9 @@ Auto insurance premium pricing is notoriously difficult, especially for individu
 This project aims to determine if a deductible has an impact on the relationship liability premium and the years an insured has been licensed. A deductible is a payment that an insured makes on a policy under the threshold they decide if a loss occurs. The initial assumption is yes, because a deductible reduces the amount of money than an insurer is liable to pay, given that a loss is incurred. 
 
 ## Data
-The dataset chosen for this task was "A detailed dataset of motor insurance policies with coverage specific financial information" [@data]. It consists of 354,140 rows and 47 variables. Each row is a policy transaction, meaning a single insurance policy and its status over the year the data was collected. Each policy is tied to one vehicle only. While this dataset ranges from the years 2022 to 2024, this project only focuses on the year 2022 for brevity.
+The dataset chosen for this task was "A detailed dataset of motor insurance policies with coverage specific financial information" [@data]. It consists of 354,140 rows and 47 variables. Each row is a policy transaction, meaning a single insurance policy and its status over the year the data was collected. Each policy is tied to one vehicle only. While this dataset ranges from the years 2022 to 2024, this project only focuses on the year 2022 for brevity, meaning that a total of 3631 observations are used.
 
-The data was collected from a Spanish insurance company, and of the 354,140 observations, >185,000 of them are unique insured policies. Each of the observations is anonymized, normalized, and had its range validated by the creators of the dataset. 
+The data was collected from a Spanish insurance company, and of the 354,140 observations, >185,000 of them are unique insured policies. The remaining observations are customers who continue their plan with the insurance company for multiple years. Each of the observations is anonymized, normalized, and had its range validated by the creators of the dataset. Because the data is limited to a single insurance company located in Europe, the conclusions from the study are limited to conclusions in the European insurance market.
 
 The response variable in question for this project is `liability premium`. The predictor variable is `years_licensed`, which is the number of years an insured has held their driver's license. Because `years_licensed` is not a variable in the original dataset, it is derived from `driver_age` (the age of the driver) and `age_driving_license` (at what age the driver earned their license).
 
@@ -171,23 +180,27 @@ To investigate the relationship between `liability_premium` and `years_licensed`
 $$
     Y = \beta_0 + \beta_1X + \epsilon
 $$
-where Y is the predicted `liability_premium`, $\beta_0$ is the intercept, $\beta_1$ is the slope, $X$ is the `years_licensed` and $\epsilon$ is the error. 
+where Y is the predicted `liability_premium`, $\beta_0$ is the intercept, $\beta_1$ is the slope, $X$ is the `years_licensed` and $\epsilon$ is the error. $\beta_0$ represents base liability premium, given an insured has their license for 0 years. $\beta_1$ represents the expected increase in liability premium given a one year increase in the number of years and insured is licensed. 
 
-The assumptions of simple linear regression are:
-
-- A linear relationship between the predictor and response
-- Independent errors
-- Normal errors with mean 0 and variance $\sigma^2$
-- Equal variance among errors
+In order for the simple linear regression model to hold, there must be a linear relationship between the predictor and response, the errors must be independent and normal with a mean of 0, and the variance among errors must be equal. However, some of these assumptions may be relaxed with large sample sizes.
 
 R [@r] is used for the analysis and plotting.
 
 
 ## Results
 
-Simple linear regression indicates there is a weak negative relationship between liability premium and the number of years licensed for COMP_E policies. More specifically, for every year longer an insured is licensed, they can expect their liability premium to decrease by about $1.76. However, both the slope and y intercept are statistically significant, but the change very minor amount compared to the general cost of a premium. Furthermore, years insured only explains 2.49% of the variance in liability premium, which makes sense as there are many more factors that can contribute to an insured's liability premium cost changing.
+```{r}
+#| echo: false
+#| include: false
+ci(data, 2022, "COMP_E")
+ci(data, 2022, "COMP_N")
+```
 
-As for COMP_N policies, there is no discernable linear relationship between the years licensed and liability premium. The slope was not statistically significant, and the $R^2$ was 0.0015, meaning that the fitted regression line only explained 0.15% of the variance in liability premium. 
+Simple linear regression indicates there is a weak negative relationship between liability premium and the number of years licensed for COMP_E policies. More specifically, for every year longer an insured is licensed, they can expect their liability premium to decrease by about $1.76. The confidence interval for the slope is (-2.52, -1). Both values in the interval being negative lend creedence to the idea that being licensed for longer leads to lower liability premium. Both the slope and y intercept are statistically significant, but the change very minor amount compared to the general cost of a premium. Furthermore, years insured only explains 2.49% of the variance in liability premium, which makes sense as there are many more factors that can contribute to an insured's liability premium cost changing.
+
+As for COMP_N policies, there is no discernable linear relationship between the years licensed and liability premium. The slope was not statistically significant, and the $R^2$ was 0.0015, meaning that the fitted regression line only explained 0.15% of the variance in liability premium. The predicted slope is -0.3, meaning we expect a $0.30 decrease in liability premium for a one year increase in years licensed. However, in the case of COMP_N policies, the interval is (-1.45, 0.85). Because 0 is in the interval, It is possible that there is no relationship whatsoever in years licensed and the liability premium, which seems to correspond with the high p value and low $R^2$. 
+
+
 
 ```{r}
 #| label: fig-policy-plots
@@ -205,35 +218,48 @@ compn_ins = insplot(data, 2022, "COMP_N", include_params=TRUE)
 
 The residual error plots below show that there is a clear nonlinearity in the data. This nonlinearity makes sense, as liability premium has a lower bound of 0. Furthermore, the errors do not seems to appear normal, as they all skew upwards. This again is most likely due to the nature of the data, where there is no upper bound on liability premium but there is a lower bound of 0. Furthermore, the variance does not seem to have equal variance. In the COMP_E residual plot, the larger fitted values have a wider spread than the smaller fitted values. The COMP_N plot clearly shows a nonlinearity as small fitted values have positive residual errors, and large ones also have only positive residual errors.
 
-These plots indicate that linear regression is not a great fit for this data, and especially not for inference of the liability premium.
-
 ```{r}
 #| label: fig-residual-plots
 #| fig-align: center
 #| fig-pos: 'H'
-#| fig-height: 6
+#| fig-height: 4
 #| echo: false
 compe_res = resplot(data, 2022, "COMP_E")
 compn_res = resplot(data, 2022, "COMP_N")
-(compe_res / compn_res) + plot_annotation(title="Residual Errors")
+(compe_res + compn_res) + plot_annotation(title="Residual Errors")
 ```
 
 ```{r}
-#| label: fig-qq-plots
+#| label: fig-compe-qq-plots
 #| fig-align: center
 #| fig-pos: 'H'
-#| fig-height: 6
+#| fig-height: 2
 #| echo: false
 compe_qq = qqplot_res(data, 2022, "COMP_E")
-compn_qq = qqplot_res(data, 2022, "COMP_N")
-(compe_qq / compn_qq) + plot_annotation(title="QQ Plots")
+compe_qq
 ```
 
-The QQ plots for the errors show clear error nonlinearity in both, with mainly a tail to the right, which makes the statistical tests for the $\beta_0$ and $\beta_1$ untrustworthy. b
+The quantile quantile plot for residual errors of the COMP_E model fit show that the left tail minorly deviates but the right tail heavily deviates from a normal distribution, meaning that the errors of this model are not normal. This makes sense, as there is technically no upper bound on how much a liability premium could be, but there is a lower bound.
+
+```{r}
+#| label: fig-compn-qq-plots
+#| fig-align: center
+#| fig-pos: 'H'
+#| fig-height: 2
+#| echo: false
+compn_qq = qqplot_res(data, 2022, "COMP_N")
+compn_qq
+```
+
+The quantile quantile plot for residual errors of the COMP_N model fit also show that the left tail deviates from the normal less than the COMP_E model, and also the right tail deviates less than the COMP_E model from normal, but the errors do still indeed deviate.
+
+Even though these plots show that there is nonnormality in the errors, due to the large sample size of 3631, we can say the models do fit the assumptions. However, we should still take estimates with a grain of salt.
+
+Because of this, we would say that in general, the models are a decent fit for the data. They tell us that there is a minor negative linear relationship between the number of years an insured has been licensed, and their corresponding liability premium of for a COMP_E policy. Furthermore, we also learn that there seems to be no linear relationship between the years licensed of an insured and the liability premium of COMP_N policies. 
 
 ## Conclusion
 
-This projects finds that a deductible makes liability premium somewhat more predictable, given the number of years an insured has been licensed. This makes intuitive sense, as a COMP_N policy encourages an insured to claim every small dent and scratch on a vehicle, contrary to a COMP_E policy which pushes the cost of minor damage of a vehicle to the owner. 
+This projects finds that a deductible makes liability premium somewhat more predictable in the European insurance market, given the number of years an insured has been licensed. This makes intuitive sense, as a COMP_N policy encourages an insured to claim every small dent and scratch on a vehicle, contrary to a COMP_E policy which pushes the cost of minor damage of a vehicle to the owner. 
 
 The cost of a COMP_E policy being minorly explained by the number of years an insured has been licensed is reasonable, as being licensed for longer generally indicates an insured is a safer driver, thus causing less damage to their own vehicle and others. 
 
